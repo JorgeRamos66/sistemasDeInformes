@@ -7,12 +7,12 @@ window.FORMS = {
   informe_docente: {
     tipo: 'informe_docente',
     titulo: 'INFORME DE ACTIVIDADES DOCENTES',
-    indexar: ['ciclo', 'departamento', 'asignatura'], // se copian a columnas de la tabla para filtrar/reportar
+    // OJO: el orden de las opciones de "checks" debe coincidir con el orden de las viñetas de plantilla.docx (ver docx.js).
     pie: 'Importante: resguarde la documentación del desarrollo de la asignatura (planificaciones, grillas, informe y evaluaciones de los estudiantes). Será de utilidad para procesos de acreditación y otras instancias evaluativas.',
     secciones: [
       { titulo: 'Datos generales', campos: [
         { k: 'fecha', type: 'date', label: 'Fecha' },
-        { k: 'ciclo', type: 'text', label: 'Ciclo lectivo / cuatrimestre (ej: 2026 - 2º cuatrimestre)' },
+        { k: 'ciclo', type: 'text', label: 'Ciclo lectivo / cuatrimestre (ej: 2026 - 2º cuatrimestre). Solo para ordenar los informes: no aparece en el documento' },
         { k: 'departamento', type: 'text', label: 'Departamento / Área' },
         { k: 'asignatura', type: 'text', label: 'Asignatura' },
         { k: 'plan', type: 'text', label: 'Plan de Estudios (especificar año y RM)' },
@@ -20,8 +20,10 @@ window.FORMS = {
       { titulo: '1) Plantel docente afectado al dictado en el ciclo lectivo informado', campos: [
         { k: 'plantel', type: 'tabla', cols: [
           { k: 'nombre', label: 'Apellido y Nombre' }, { k: 'dni', label: 'DNI' },
-          { k: 'categoria', label: 'Categoría (ej: Prof. Titular)' }, { k: 'dedicacion', label: 'Dedicación (ej: Exclusiva)' },
-          { k: 'revista', label: 'Situación de revista (ej: Ordinario)' },
+          // Mismas listas desplegables que el documento original.
+          { k: 'categoria', label: 'Categoría', opciones: ['Prof. TItular', 'Prof. Adjunto', 'Prof. Libre', 'JTP', 'Auxiliar de Primera', 'Adscripto/a', 'Prof. Responsable'] },
+          { k: 'dedicacion', label: 'Dedicación', opciones: ['Exclusiva', 'Semiexclusiva', 'Simple'] },
+          { k: 'revista', label: 'Situación de revista', opciones: ['Ordinario', 'Interino', 'Contrato temporal', 'Cobertura de vacante', 'Licencia con G/H', 'Licencia sin G/H', 'Carga o tareas asignadas'] },
         ] },
       ] },
       { titulo: '2) Resultados del cursado', campos: [

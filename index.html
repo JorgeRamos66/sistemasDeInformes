@@ -112,9 +112,10 @@
   input[type=checkbox]:active, input[type=radio]:active { transform:scale(.85); }
   input[type=checkbox]:focus, input[type=radio]:focus { box-shadow:0 0 0 3px var(--accent-soft); }
 
-  table { border-collapse:collapse; width:100%; }
-  th, td { border:1px solid var(--line); padding:8px 10px; text-align:left; vertical-align:middle; font-size:.92rem; }
-  th { font-weight:600; background:var(--bg); }
+  /* Tablas con alcance a <main>: el PDF (#print) muestra el .docx tal cual y no debe heredar estos estilos. */
+  main table { border-collapse:collapse; width:100%; }
+  main th, main td { border:1px solid var(--line); padding:8px 10px; text-align:left; vertical-align:middle; font-size:.92rem; }
+  main th { font-weight:600; background:var(--bg); }
   td input[type=radio] { margin:auto; }
   td input:not([type=radio]) { margin:0; min-width:80px; }
   td[data-pct] { color:var(--accent); font-weight:600; white-space:nowrap; }
@@ -131,14 +132,33 @@
   @media (max-width:900px) { .layout { grid-template-columns:1fr; } #nav { display:none; } main { padding:16px; } header { padding:12px 16px; } }
   @media (prefers-reduced-motion:reduce) { *, ::before, ::after { animation:none !important; transition:none !important; scroll-behavior:auto !important; } }
 
+  /* Pestañas, tarjetas, código y administración */
+  .tabs { display:flex; gap:4px; border-bottom:1px solid var(--line); margin-bottom:20px; }
+  .tabs button { background:transparent; color:var(--muted); border:0; border-bottom:3px solid transparent; border-radius:0; padding:10px 18px; margin-bottom:-1px; }
+  .tabs button:hover { box-shadow:none; transform:none; color:var(--ink); }
+  .tabs button[aria-selected="true"] { color:var(--ink); border-bottom-color:var(--accent); }
+  .card { background:var(--surface); border:1px solid var(--line); border-radius:12px; box-shadow:var(--shadow); padding:24px; max-width:680px; }
+  .card h1 { font-size:1.7rem; margin:0 0 .5em; }
+  #code { display:block; font:600 1.5rem ui-monospace, Consolas, monospace; letter-spacing:.15em; text-transform:uppercase; max-width:340px; margin-bottom:14px; }
+  .codebox { display:flex; align-items:center; gap:8px 20px; flex-wrap:wrap; background:var(--accent-soft); border:1px solid var(--accent); border-radius:12px; padding:12px 18px; margin-bottom:18px; }
+  .codebox .lbl { display:block; font-size:.8rem; color:var(--muted); }
+  .codebox .hint { margin:0; flex-basis:100%; }
+  #codetxt { font:700 1.6rem ui-monospace, Consolas, monospace; letter-spacing:.18em; color:var(--accent); }
+  .codebox.pending #codetxt { font:500 1rem 'Public Sans', sans-serif; letter-spacing:0; color:var(--muted); }
+  select { width:100%; min-width:120px; padding:9px 10px; border:1.5px solid var(--line); border-radius:8px; background:var(--bg); color:var(--ink); font:inherit; }
+  select:focus { outline:0; border-color:var(--accent); box-shadow:0 0 0 3px var(--accent-soft); }
+  #search { max-width:300px; margin:0; }
+  #arows code { font-weight:600; letter-spacing:.08em; }
+  td[data-tot] { text-align:center; font-weight:700; color:var(--accent); }
+
+  /* PDF: se imprime el .docx renderizado, sin estilos de la aplicación */
   #print { display:none; }
+  @page { margin:0; }
   @media print {
     body > *:not(#print) { display:none !important; }
-    body { background:#fff; }
-    #print { display:block; color:#000; background:#fff; font-size:11pt; }
-    #print h1 { text-align:center; font-size:16pt; } #print h2 { font-size:12pt; margin-top:14pt; }
-    #print table { page-break-inside:auto; font-size:9pt; } #print tr { page-break-inside:avoid; }
-    #print th, #print td { border:1px solid #000; background:none; color:#000; }
+    html, body { background:#fff !important; }
+    #print { display:block; }
+    #print section.docx { box-shadow:none !important; margin:0 !important; }
   }
 </style>
 </head>
@@ -152,28 +172,53 @@
   </button>
 </header>
 <main>
-  <div id="list" class="view" hidden>
-    <div class="head">
-      <div>
-        <h1>Informes</h1>
-        <p class="hint">Acá aparecen los informes cargados. Al terminar, descargá el .docx o el PDF.</p>
-      </div>
-      <button id="new">Nuevo informe</button>
+  <div id="home" class="view" hidden>
+    <div class="tabs" role="tablist">
+      <button role="tab" data-tab="nuevo" aria-selected="true">Nuevo informe</button>
+      <button role="tab" data-tab="codigo" aria-selected="false">Código</button>
     </div>
-    <div class="panel">
-      <table><thead><tr><th>Asignatura</th><th>Ciclo</th><th>Estado</th><th>Modificado</th><th></th></tr></thead><tbody id="rows"></tbody></table>
+    <div id="tab-nuevo" class="card">
+      <h1>Informe de actividades docentes</h1>
+      <p>Completá el informe de fin de cuatrimestre y descargalo en Word o PDF con el formato oficial. Al guardarlo se genera un código de 10 caracteres: con ese código podés volver a abrirlo y editarlo.</p>
+      <button id="new">Empezar un informe</button>
+    </div>
+    <div id="tab-codigo" class="card" hidden>
+      <h1>Abrir un informe con su código</h1>
+      <form id="codeForm">
+        <label>Código del informe <input id="code" maxlength="12" autocomplete="off" spellcheck="false" placeholder="Ej: K7M2PX94QA"></label>
+        <button>Abrir informe</button>
+      </form>
+    </div>
+  </div>
+
+  <div id="admin" class="view" hidden>
+    <div id="anokey" class="card" hidden>
+      <h1>Administración</h1>
+      <p>Este enlace no tiene una clave válida. Usá el enlace completo, que termina en <code>#k=…</code>.</p>
+    </div>
+    <div id="alist" hidden>
+      <div class="head">
+        <div><h1>Todos los informes</h1><p class="hint" id="acount"></p></div>
+        <div class="bar"><input id="search" type="search" placeholder="Buscar por código, asignatura…" aria-label="Buscar informes"></div>
+      </div>
+      <div class="panel">
+        <table><thead><tr><th>Código</th><th>Asignatura</th><th>Departamento</th><th>Ciclo</th><th>Modificado</th><th></th></tr></thead><tbody id="arows"></tbody></table>
+      </div>
     </div>
   </div>
 
   <div id="editor" class="view" hidden>
     <div class="tools">
-      <button id="back" class="sec">Volver a informes</button>
-      <button id="save">Guardar borrador</button>
-      <button id="send" class="sec">Marcar como enviado</button>
+      <button id="back" class="sec">Salir</button>
+      <button id="save">Guardar</button>
       <button id="docx" class="sec">Descargar .docx</button>
       <button id="pdf" class="sec">Descargar PDF</button>
-      <span class="estado">Estado: <b id="estado"></b></span>
       <div class="prog" aria-hidden="true"><i id="bar"></i></div>
+    </div>
+    <div id="codebox" class="codebox">
+      <div><span class="lbl">Código del informe</span><b id="codetxt"></b></div>
+      <button id="copy" class="sec" hidden>Copiar código</button>
+      <p class="hint">Guardalo: es la única forma de volver a abrir este informe.</p>
     </div>
     <div class="layout">
       <nav id="nav" aria-label="Secciones del informe"></nav>
@@ -185,9 +230,11 @@
 <div id="print"></div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/docx@8.5.0/build/index.umd.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/docx-preview@0.3.3/dist/docx-preview.min.js"></script>
 <script src="config.js"></script>
 <script src="schema.js"></script>
+<script src="docx.js"></script>
 <script src="app.js"></script>
 </body>
 </html>

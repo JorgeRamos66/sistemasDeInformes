@@ -1,112 +1,82 @@
-# Tutorial: poner en marcha el sistema de informes (de cero)
+# Sistema de informes docentes: guía de uso y mantenimiento
 
-## Cómo está armado (arquitectura)
+## Cómo funciona
 
 ```
-Docente (navegador)
-   │  abre https://TU-USUARIO.github.io/TU-REPO/
-   ▼
-GitHub Pages ── sirve archivos estáticos: index.html + app.js + schema.js + config.js
-   │
-   │  (el JavaScript del navegador habla directo con Supabase por HTTPS)
-   ▼
-Supabase ── Auth (usuarios) + Postgres (tabla `informes`) + RLS (reglas de seguridad)
+Docente ──► GitHub Pages (index.html + JS) ──► Supabase (base de datos)
 ```
 
-- **GitHub Pages** solo entrega archivos. No ejecuta código del servidor.
-- **Supabase** es la base de datos y el login. La seguridad NO está en el JavaScript (cualquiera puede verlo) sino en las reglas **RLS** de la base: cada docente solo puede leer/escribir sus propios informes.
-- **.docx** se genera en el navegador con la librería `docx`; **PDF** con el diálogo "Imprimir → Guardar como PDF". No hay servidor propio.
-- **Escalabilidad**: el formulario entero está descrito en `schema.js`. La tabla `informes` guarda cada formulario como JSON (`datos`) más unas columnas (`ciclo`, `departamento`, `asignatura`) para filtrar. Un formulario nuevo = otra entrada en `schema.js`, sin cambiar la base de datos. Hay rol `admin` para que secretaría lea todos los informes.
+- **Docentes (sin login):** entran a la página, completan el informe y lo guardan. Al guardar se genera un **código de 10 caracteres** (ej. `K7M2PX94QA`). Con ese código, desde la pestaña **Código**, pueden volver a abrir el informe, editarlo o descargarlo. Los informes **no se pueden listar ni buscar**: sin el código no hay forma de llegar a uno.
+- **Descargas:** el **.docx** se arma sobre el documento original (`plantilla.docx`), así que conserva logo, tipografías, tamaños, bordes y listas desplegables. El nombre del archivo termina con el código: `Informe_Internetworking_K7M2PX94QA.docx`. Antes de descargar, el sistema guarda automáticamente, así el archivo siempre coincide con lo guardado.
+- **Administración (sin contraseña):** `https://TU-USUARIO.github.io/sistemasDeInformes/#k=LA-CLAVE`. Es un enlace privado: la clave larga del final reemplaza a la contraseña. Muestra la lista de **todos** los informes (con su código), con búsqueda, y permite abrir, editar, descargar y eliminar. **No compartir ese enlace**: quien lo tenga ve todo.
 
 | Archivo | Para qué |
 |---|---|
-| `index.html` | Pantallas (login, listado, formulario) y estilos |
-| `schema.js` | **Definición del formulario** (preguntas, opciones) |
-| `app.js` | Lógica: login, guardar, exportar .docx/PDF |
-| `config.js` | URL y clave pública de Supabase (la completás en el paso 3) |
-| `supabase.sql` | Crea las tablas y las reglas de seguridad |
+| `index.html` | Pantallas y estilos (inicio, formulario, administración) |
+| `schema.js` | **Definición del formulario** (preguntas y opciones) |
+| `docx.js` | Rellena `plantilla.docx` con los datos del informe |
+| `plantilla.docx` | El anexo original: **no editarlo** salvo que cambie el formato oficial |
+| `app.js` | Lógica: guardar, códigos, descargas, administración |
+| `config.js` | URL y clave pública de Supabase |
+| `supabase.sql` | Tablas, funciones y reglas de seguridad |
 
 ---
 
-## Paso 1 — Crear el proyecto en Supabase
+## Actualizar la base de datos (Supabase)
 
-1. Entrá a <https://supabase.com> → **Start your project** → registrate (podés usar tu cuenta de GitHub).
-2. **New project**: ponele nombre (ej. `informes-docentes`), elegí una contraseña de base de datos (guardala), región **South America (São Paulo)**. Plan **Free**. Esperá 1–2 minutos.
+Cada vez que cambie `supabase.sql`, se pega completo en **SQL Editor → New query → Run**. Se puede ejecutar varias veces sin problema y **no borra los informes existentes** (los que ya estaban reciben su código).
 
-## Paso 2 — Crear las tablas
+Debe terminar con **"Success"**. Esto: cierra el acceso abierto, agrega los códigos y crea las funciones que usa el sistema.
 
-1. Menú izquierdo → **SQL Editor** → **New query**.
-2. Abrí `supabase.sql`, copiá TODO, pegalo, y apretá **Run**. Debe decir "Success".
-3. Verificá en **Table Editor**: aparecen `informes` y `profiles`.
+## Obtener el enlace de administración
 
-## Paso 3 — Copiar las claves al proyecto
-
-1. **Project Settings (engranaje) → API** (o "API Keys").
-2. Copiá **Project URL** y la clave **anon / public** (en proyectos nuevos puede llamarse *Publishable key*).
-3. Pegalas en `config.js`:
-   ```js
-   SUPABASE_URL: 'https://abcdefgh.supabase.co',
-   SUPABASE_KEY: 'eyJhbGciOi...',
-   ```
-4. ⚠️ **Nunca** uses la clave `service_role` / *secret*: esa sí da acceso total. La `anon` es pública a propósito; la protege RLS (paso 2).
-
-## Paso 4 — Configurar el login
-
-**Authentication → Providers → Email** (ya viene activo).
-- Para **probar rápido**: desactivá **Confirm email**. Así las cuentas entran sin verificar el correo.
-- Para **producción**: dejalo activado (los docentes confirman por mail) y en **Authentication → URL Configuration** poné como *Site URL* la dirección de tu GitHub Pages (paso 6). Ojo: el plan gratuito limita los mails de confirmación por hora; si son muchos docentes, conviene configurar un SMTP propio (Authentication → SMTP Settings).
-
-## Paso 5 — Probar en tu computadora
-
-Desde la carpeta del proyecto, en PowerShell:
-
-```powershell
-python -m http.server 8000
-```
-
-Abrí <http://localhost:8000>, creá una cuenta, completá un informe, guardá, y descargá el .docx y el PDF. (No abras `index.html` con doble clic: algunas funciones del navegador requieren `http://`.)
-
-## Paso 6 — Publicar en GitHub Pages
-
-1. Creá una cuenta en <https://github.com> si no tenés.
-2. **New repository** → nombre `informes-docentes`, **Public** (el plan gratuito de Pages lo exige público). Es seguro: no hay secretos en el código (la clave `anon` es pública).
-3. Subí los archivos: en el repo → **Add file → Upload files** → arrastrá `index.html`, `app.js`, `schema.js`, `config.js` (el `supabase.sql` y este tutorial son opcionales) → **Commit changes**.
-4. **Settings → Pages** → *Source*: **Deploy from a branch** → Branch **main** / carpeta **/(root)** → **Save**.
-5. Al minuto, tu sistema está en `https://TU-USUARIO.github.io/informes-docentes/`.
-6. Volvé a Supabase → **Authentication → URL Configuration** y pegá esa dirección en *Site URL*.
-
-Para actualizar algo más adelante: editá el archivo en GitHub (lápiz) o subilo de nuevo → se republica solo.
-
-## Paso 7 — Dar rol de administrador (secretaría)
-
-Después de que esa persona se registre en el sistema, en **SQL Editor**:
+Al ejecutar `supabase.sql` se genera solo una clave secreta. Para verla, en el **SQL Editor**:
 
 ```sql
-update public.profiles set rol = 'admin'
-where id = (select id from auth.users where email = 'secretaria@ejemplo.com');
+select clave from public.config_admin;
 ```
 
-Un admin puede **leer** todos los informes desde Supabase (Table Editor → `informes`, y desde ahí exportar a CSV). La pantalla del sistema todavía muestra solo los informes propios.
+Tu enlace es `https://TU-USUARIO.github.io/sistemasDeInformes/#k=` seguido de esa clave. Guardalo en favoritos.
+
+- Para **cambiar la clave** (por ejemplo si el enlace se filtró): `update public.config_admin set clave = encode(extensions.gen_random_bytes(18), 'hex');` y volver a consultarla. El enlace viejo deja de funcionar.
+- Recomendado: **Authentication → Sign In / Providers → Email** → desactivar **Allow new users to sign up**, porque el sistema ya no usa cuentas.
+
+## Publicar los cambios en GitHub Pages
+
+Subir al repositorio los archivos que cambiaron (todos los de la tabla, incluido `plantilla.docx`). Desde la carpeta del proyecto, en PowerShell:
+
+```powershell
+git add .
+git commit -m "Códigos de informe, administración y plantilla docx"
+git push
+```
+
+En 1 o 2 minutos se actualiza el sitio. Si el navegador sigue mostrando la versión vieja, recargar con **Ctrl + F5**.
 
 ## Cómo modificar el formulario
 
-Todo está en `schema.js`. Ejemplos:
-- Agregar una opción a una lista: sumar un texto al arreglo `opciones`.
-- Agregar una pregunta de texto: `{ k: 'mi_campo', type: 'textarea', label: 'Mi pregunta' }` dentro de una sección. `k` debe ser único y sin espacios.
-- Tipos disponibles: `text`, `date`, `textarea`, `checks` (tildar varias), `radios` (una opción), `matrix` (filas × opciones), `tabla` (filas que se agregan), `stats` (cuadro de resultados con porcentajes automáticos).
-- Los informes ya guardados siguen funcionando: los campos nuevos simplemente aparecen vacíos.
+Todo está en `schema.js`.
+- **Agregar una pregunta de texto:** `{ k: 'mi_campo', type: 'textarea', label: 'Mi pregunta' }` dentro de una sección (`k` único y sin espacios).
+- **Importante:** el documento Word tiene un lugar fijo para cada dato. Una pregunta nueva se guarda en la base pero **no aparece en el .docx** salvo que se agregue también en `docx.js`. Las listas de opciones (viñetas tildables) deben mantener el **mismo orden** que en `plantilla.docx`.
+- Tipos disponibles: `text`, `date`, `textarea`, `checks`, `radios`, `matrix`, `tabla`, `stats`.
+
+## Sobre el PDF
+
+El botón **Descargar PDF** muestra el documento en el diálogo de impresión: elegir **Guardar como PDF**, tamaño A4. El PDF se genera desde el mismo .docx, pero lo dibuja el navegador, no Word, así que **puede haber diferencias mínimas** (espaciados, tipografía si la computadora no tiene la fuente). Si hace falta un PDF idéntico al milímetro: descargar el .docx, abrirlo en Word y usar *Guardar como → PDF*.
 
 ## Problemas comunes
 
 | Síntoma | Causa probable |
 |---|---|
-| "Invalid API key" / "Failed to fetch" | `config.js` mal copiado (URL o clave) |
-| "new row violates row-level security" | No corriste `supabase.sql` completo, o no hay sesión iniciada |
-| "Email not confirmed" | Confirm email activo: confirmar desde el correo o desactivarlo (paso 4) |
-| Página en blanco en GitHub Pages | Pages no activado, o `index.html` no está en la raíz del repo |
-| PDF sale cortado | En el diálogo de impresión: tamaño A4, márgenes "Predeterminado", destino "Guardar como PDF" |
+| "No se pudo guardar: Could not find the function…" | No se ejecutó `supabase.sql` completo |
+| "No existe ningún informe con ese código" | Código mal escrito (10 letras y números; no usa 0, O, 1, I) |
+| "La clave del enlace no es correcta" | Enlace mal copiado, o se cambió la clave en `config_admin`. Volver a consultarla |
+| Página vieja después de subir cambios | Recargar con Ctrl + F5 |
+| Errores de conexión tras semanas sin uso | El plan gratuito de Supabase pausa el proyecto: reactivarlo desde su panel |
 
-## Límites del plan gratuito (a tener en cuenta)
+## Seguridad: lo que hay que saber
 
-- Supabase Free pausa el proyecto tras ~1 semana sin actividad (se reactiva con un clic en el panel) y no incluye backups automáticos. Si el sistema va a ser oficial, exportá los datos periódicamente o pasá a un plan pago.
-- El `.docx` generado replica el contenido del formulario, no el diseño gráfico exacto del anexo original (membrete, logos, firma impresa).
+- La clave `sb_publishable_…` de `config.js` es pública por diseño. **Nunca** poner la clave *secret* / `service_role`.
+- Cualquiera con la dirección del sitio puede **crear** informes (no hay login para docentes). No hay límite de cantidad, así que alguien podría llenar la base con basura. Si ocurre, se limpia desde el panel de administración.
+- Los informes incluyen DNI de docentes: quien tenga un código ve y edita ese informe. Tratar los códigos como una contraseña.
+- Supabase Free no hace copias de seguridad automáticas. Exportar `informes` a CSV periódicamente (Table Editor → Export).
